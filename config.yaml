@@ -1,0 +1,13 @@
+project:
+  random_seed: 42
+
+paths:
+  dataset: data/H2.csv
+  outputs: outputs
+  artifacts: artifacts
+
+logging:
+  level: INFO
+  format: "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+  date_format: "%Y-%m-%d %H:%M:%S"
+
