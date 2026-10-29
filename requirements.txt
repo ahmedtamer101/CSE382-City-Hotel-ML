@@ -1,6 +1,9 @@
-pandas>=2.0
-numpy>=1.24
-scikit-learn>=1.2
-pyyaml>=6.0
-joblib>=1.2
-pytest>=7.0
+numpy
+pandas
+scikit-learn
+matplotlib
+seaborn
+scipy
+PyYAML
+joblib
+pytest
