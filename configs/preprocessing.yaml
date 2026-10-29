@@ -1,0 +1,29 @@
+# Preprocessing + split configuration (Member 2 — Preprocessing, Feature Design & Leakage)
+# Every downstream member must use these splits; do not re-split the data yourself.
+
+seed: 42
+
+paths:
+  raw: data/raw/H2.csv                 # City Hotel only (79,330 rows, 31 columns)
+  interim: data/interim                # cleaned + engineered full table with split labels
+  processed: data/processed            # task-specific train/val/test CSVs
+  artifacts: artifacts/preprocessing   # fitted preprocessors (joblib) — NOT committed / NOT zipped
+  outputs: outputs/preprocessing       # summary tables for the report
+
+split:
+  # 60 / 20 / 20 train / validation / test, stratified on IsCanceled,
+  # grouped so identical bookings never fall in two different splits.
+  stratify_on: IsCanceled
+  test_folds: 5        # 1 of 5 folds  -> 20 % test
+  val_folds: 4         # 1 of 4 folds of the remainder -> 20 % validation
+  cv_folds: 5          # recommended GroupKFold/StratifiedGroupKFold folds on train(+val)
+
+cleaning:
+  adr_max: 1000             # ADR above this is a data-entry error (single 5,400 value)
+  drop_zero_guests: true    # Adults + Children + Babies == 0 is not a valid booking
+  regression_min_nights: 1  # ADR is undefined for 0-night stays -> excluded from regression only
+
+encoding:
+  min_frequency: 0.005      # categories below 0.5 % of TRAIN rows are grouped as "infrequent"
+
+export_transformed: true    # also write scaled/encoded matrices for quick use by members 3-4
