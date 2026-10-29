@@ -1,6 +1,57 @@
-# generated - regenerate with: python -m src.preprocessing.run
-data/
-artifacts/
+# Python bytecode and caches
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Packaging and build output
+build/
+dist/
+*.egg-info/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.code-workspace
+*.swp
+*.swo
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local datasets (retain directory placeholder)
+/data/**
+!/data/.gitkeep
+*.csv
+!/outputs/**/*.csv
+!/reports/**/*.csv
+
+# Trained models and serialized preprocessing objects
+*.joblib
+*.pkl
+*.pickle
+*.sav
+*.onnx
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+~$*
