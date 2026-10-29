@@ -4,7 +4,7 @@
 seed: 42
 
 paths:
-  raw: data/raw/H2.csv                 # City Hotel only (79,330 rows, 31 columns)
+  raw: data/H2.csv                 # City Hotel only (79,330 rows, 31 columns)
   interim: data/interim                # cleaned + engineered full table with split labels
   processed: data/processed            # task-specific train/val/test CSVs
   artifacts: artifacts/preprocessing   # fitted preprocessors (joblib) — NOT committed / NOT zipped
