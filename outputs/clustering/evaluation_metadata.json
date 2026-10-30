@@ -1,0 +1,35 @@
+{
+  "baseline_inertia": 597856.3237440714,
+  "baseline_parameters": {
+    "init": "k-means++",
+    "max_iter": 300,
+    "n_clusters": 3,
+    "n_init": 10,
+    "random_state": 42
+  },
+  "baseline_transformed_features": 48,
+  "dataset_sha256": "6796f5b9b2b9e7281662b29730fc2880f8e614107d0d14d09be2ede1a6e605a4",
+  "dbi_rows": 79330,
+  "dense_budget_bytes": 67108864,
+  "distance_space": "exact fitted Phase 3 transformed feature matrix",
+  "full_dense_feature_bytes_estimate": 30462720,
+  "outcome_fields_used": false,
+  "package_versions": {
+    "numpy": "2.5.4",
+    "pandas": "3.1.0",
+    "python": "3.14.7",
+    "scikit_learn": "1.9.1",
+    "scipy": "1.18.1"
+  },
+  "row_alignment": "original positional order; no rows removed",
+  "sample_cluster_counts": {
+    "0": 1519,
+    "1": 1277,
+    "2": 204
+  },
+  "sample_max_rows": 3000,
+  "sample_method": "proportional_stratified_without_replacement",
+  "sample_rows": 3000,
+  "sample_seed": 42,
+  "silhouette_pairwise_distance_bytes_estimate": 72000000
+}

@@ -29,6 +29,7 @@ from sklearn.cluster import KMeans
 from sklearn.exceptions import ConvergenceWarning
 
 from src.clustering.features import (
+    ClusteringFeatureBundle,
     EXPECTED_SOURCE_COLUMNS,
     LEAKAGE_COLUMNS,
     MODEL_FEATURE_COLUMNS,
@@ -102,6 +103,8 @@ class KMeansBaselineResult:
     metadata: dict[str, Any]
     feature_names: tuple[str, ...]
     model: KMeans = field(repr=False)
+    transformed_matrix: Any = field(repr=False)
+    feature_bundle: ClusteringFeatureBundle = field(repr=False)
 
 
 def build_kmeans_baseline(
@@ -298,6 +301,8 @@ def run_kmeans_baseline(
         metadata=metadata,
         feature_names=feature_names,
         model=model,
+        transformed_matrix=transformed,
+        feature_bundle=bundle,
     )
 
 
