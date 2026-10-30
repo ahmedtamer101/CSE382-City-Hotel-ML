@@ -1,0 +1,76 @@
+{
+  "baseline_inertia": 597856.3237440714,
+  "baseline_parameters": {
+    "init": "k-means++",
+    "max_iter": 300,
+    "n_clusters": 3,
+    "n_init": 10,
+    "random_state": 42
+  },
+  "cluster_counts": {
+    "0": 40174,
+    "1": 33752,
+    "2": 5404
+  },
+  "dataset_rows": 79330,
+  "dataset_sha256": "6796f5b9b2b9e7281662b29730fc2880f8e614107d0d14d09be2ede1a6e605a4",
+  "figures": [
+    {
+      "file": "figures/cluster_size_distribution.png",
+      "inputs": "verified fixed K-Means labels",
+      "scope": "all_rows"
+    },
+    {
+      "file": "figures/lead_time_by_cluster.png",
+      "inputs": "LeadTime in original days; verified labels",
+      "scope": "all_rows"
+    },
+    {
+      "file": "figures/total_nights_by_cluster.png",
+      "inputs": "TotalNights in original nights; verified labels; >10 tail",
+      "scope": "all_rows"
+    },
+    {
+      "file": "figures/market_segment_by_cluster.png",
+      "inputs": "original MarketSegment; verified labels",
+      "scope": "all_rows"
+    },
+    {
+      "file": "figures/deposit_type_by_cluster.png",
+      "inputs": "original DepositType; verified labels",
+      "scope": "all_rows"
+    },
+    {
+      "file": "figures/pca_cluster_projection.png",
+      "inputs": "exact fitted 48-feature matrix; verified labels",
+      "scope": "stratified_sample"
+    }
+  ],
+  "label_source": "reproduced fixed Phase 3 K-Means baseline; no PCA refit of labels",
+  "outcome_fields_used": false,
+  "pca": {
+    "cluster_labels_refitted": false,
+    "dense_budget_bytes": 67108864,
+    "dense_input_bytes_estimate": 30462720,
+    "explained_variance_ratio": [
+      0.17408869158054152,
+      0.13988165697709717
+    ],
+    "explained_variance_ratio_sum": 0.3139703485576387,
+    "fit_rows": 79330,
+    "input_features": 48,
+    "method": "centered_PCA",
+    "random_state": 42,
+    "solver": "randomized"
+  },
+  "scatter_sample": {
+    "cluster_counts": {
+      "0": 1519,
+      "1": 1277,
+      "2": 204
+    },
+    "method": "proportional_stratified_without_replacement",
+    "rows": 3000,
+    "seed": 42
+  }
+}
