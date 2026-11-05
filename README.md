@@ -174,3 +174,158 @@ Milestone 2 is expected to integrate and refine the three ML tracks through tuni
 
 Project-wide paths, logging defaults, and the random seed live in `config.yaml`. Paths are relative to the repository root so the project remains portable across contributors' machines.
 
+## Data Understanding and Exploratory Data Analysis (EDA)
+
+This module performs Data Understanding and Exploratory Data Analysis (EDA) on the original City Hotel dataset (`H2.csv`).
+
+The analysis identifies missing values, duplicate records, unusual values, outliers, feature distributions, and correlations without modifying the original dataset.
+
+### 1. Requirements
+
+Install the required Python libraries from the project root:
+
+```bash
+pip install -r requirements.txt
+```
+
+For automated testing, ensure pytest is installed:
+
+```bash
+pip install pytest
+```
+
+### 2. Dataset Setup
+
+Download the original City Hotel dataset (`H2.csv`) and place it inside the `data` directory.
+
+Expected location:
+
+```text
+data/H2.csv
+```
+
+Dataset source:
+
+https://raw.githubusercontent.com/afaq-ahmad/Hotel-booking-demand-Case-Study/master/H2.csv
+
+**Important:**
+- The dataset must contain the expected 31 columns.
+- The original dataset contains 79,330 rows.
+- The EDA script validates the dataset before running the analysis.
+- The dataset is not downloaded automatically.
+- The original dataset is not modified during analysis.
+
+### 3. Run EDA
+
+From the repository root, execute:
+
+```bash
+python -m src.data.eda --data data/H2.csv --out outputs/eda
+```
+
+Alternatively, use the default paths:
+
+```bash
+python -m src.data.eda
+```
+
+If `data/H2.csv` is missing, the script displays an error explaining where to place the dataset.
+
+### 4. Generated EDA Outputs
+
+The analysis generates CSV tables and figures inside:
+
+```text
+outputs/eda/
+```
+
+#### CSV Tables
+
+- `column_profile.csv` — Data types, missing values, and unique values.
+- `text_missing.csv` — Missing values represented as text.
+- `quality_checks.csv` — Duplicate records and unusual values.
+- `iqr_screening.csv` — Outlier detection using the IQR method.
+- `pearson_correlations.csv` — Correlations between numerical features.
+- `cancel_by_MarketSegment.csv` — Cancellation statistics by market segment.
+- `cancel_by_DepositType.csv` — Cancellation statistics by deposit type.
+- `cancel_by_CustomerType.csv` — Cancellation statistics by customer type.
+- `cancel_by_ArrivalDateMonth.csv` — Monthly cancellation statistics.
+
+#### Figures
+
+- `numerical_distributions.png` — Cancellation, lead time, and ADR distributions.
+- `categorical_distributions.png` — Distributions of important categorical variables.
+- `correlation_heatmap.png` — Correlation heatmap of numerical features.
+
+### 5. Automated Tests
+
+Automated tests are implemented in:
+
+```text
+tests/test_eda.py
+```
+
+Run the tests from the repository root:
+
+```bash
+python -m pytest tests/test_eda.py -v
+```
+
+The tests verify:
+
+1. Expected dataset column count.
+2. Missing-column detection.
+3. Unexpected-column detection.
+4. Incorrect-column-order detection.
+5. Missing-value calculations.
+6. Duplicate-record counting.
+7. Data-quality calculations.
+
+### 6. Test Results
+
+The EDA tests were executed using Google Colab.
+
+Environment:
+- Python 3.13.18
+- pytest 8.4.2
+
+Results:
+
+```text
+7 tests collected
+7 tests passed
+Execution time: 1.86 seconds
+```
+
+All seven automated tests passed successfully.
+
+### 7. EDA Report
+
+Detailed EDA findings and interpretations are documented in:
+
+```text
+reports/eda.md
+```
+
+The report covers:
+
+- Dataset structure and feature types.
+- Missing values and duplicate records.
+- Unusual values and outliers.
+- Lead time and ADR distributions.
+- Booking cancellation patterns.
+- Correlations between numerical features.
+- Recommendations for subsequent preprocessing and modeling.
+
+### 8. Reproducibility
+
+To reproduce the EDA results:
+
+1. Clone the project repository.
+2. Install the required dependencies.
+3. Place the original `H2.csv` inside `data/`.
+4. Run the EDA script.
+5. Review the generated results in `outputs/eda/`.
+6. Run the automated tests to verify the implementation.
+
+The analysis is reproducible and does not modify the original dataset.

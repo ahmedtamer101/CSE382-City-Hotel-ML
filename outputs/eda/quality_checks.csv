@@ -1,0 +1,7 @@
+check,count,percentage
+identical_rows_after_first,25902,32.651
+zero_total_guests,167,0.211
+zero_total_nights,331,0.417
+negative_lead_time,0,0.0
+negative_adr,0,0.0
+adr_over_1000,1,0.001

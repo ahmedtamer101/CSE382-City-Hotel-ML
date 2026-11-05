@@ -1,0 +1,6 @@
+feature,lower,upper,flagged,percentage
+LeadTime,-187.0,373.0,2576,3.247
+ADR,9.000000000000014,196.2,3387,4.27
+StaysInWeekNights,-2.0,6.0,719,0.906
+StaysInWeekendNights,-3.0,5.0,82,0.103
+DaysInWaitingList,0.0,0.0,3443,4.34

@@ -1,0 +1,4 @@
+DepositType,bookings,cancellation_rate
+No Deposit     ,66442,30.468679449745643
+Non Refund     ,12868,99.81349082996582
+Refundable     ,20,70.0

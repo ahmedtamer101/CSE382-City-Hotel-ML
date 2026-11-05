@@ -17,17 +17,67 @@ import pandas as pd
 import seaborn as sns
 
 
-DEFAULT_URL = (
-    "https://raw.githubusercontent.com/afaq-ahmad/"
-    "Hotel-booking-demand-Case-Study/master/H2.csv"
-)
+EXPECTED_COLUMNS = [
+    "IsCanceled",
+    "LeadTime",
+    "ArrivalDateYear",
+    "ArrivalDateMonth",
+    "ArrivalDateWeekNumber",
+    "ArrivalDateDayOfMonth",
+    "StaysInWeekendNights",
+    "StaysInWeekNights",
+    "Adults",
+    "Children",
+    "Babies",
+    "Meal",
+    "Country",
+    "MarketSegment",
+    "DistributionChannel",
+    "IsRepeatedGuest",
+    "PreviousCancellations",
+    "PreviousBookingsNotCanceled",
+    "ReservedRoomType",
+    "AssignedRoomType",
+    "BookingChanges",
+    "DepositType",
+    "Agent",
+    "Company",
+    "DaysInWaitingList",
+    "CustomerType",
+    "ADR",
+    "RequiredCarParkingSpaces",
+    "TotalOfSpecialRequests",
+    "ReservationStatus",
+    "ReservationStatusDate",
+]
 MISSING_MARKERS = {"null", "none", "n/a", "na", "nan", ""}
 MONTHS = [
     "January", "February", "March", "April", "May", "June", "July",
     "August", "September", "October", "November", "December",
 ]
 
+def validate_schema(df: pd.DataFrame) -> None:
+    """Validate the exact H2 dataset schema."""
 
+    actual_columns = list(df.columns)
+
+    if actual_columns != EXPECTED_COLUMNS:
+        missing = [
+            col for col in EXPECTED_COLUMNS
+            if col not in actual_columns
+        ]
+
+        unexpected = [
+            col for col in actual_columns
+            if col not in EXPECTED_COLUMNS
+        ]
+
+        raise ValueError(
+            "Invalid H2 dataset schema.\n"
+            f"Missing columns: {missing}\n"
+            f"Unexpected columns: {unexpected}\n"
+            "Column order must match the expected H2 schema."
+        )
 def audit(df: pd.DataFrame, out: Path) -> None:
     """Save EDA tables without modifying df or inferring row-level identity."""
     out.mkdir(parents=True, exist_ok=True)
@@ -131,24 +181,53 @@ def plots(df: pd.DataFrame, out: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data", type=Path, default=Path("data/H2.csv"))
-    parser.add_argument("--out", type=Path, default=Path("outputs/eda"))
-    args = parser.parse_args()
-    source = args.data if args.data.is_file() else DEFAULT_URL
-    df = pd.read_csv(
-    source,
-    keep_default_na=False,
-    na_values=[""],
-    low_memory=False
+
+    parser.add_argument(
+        "--data",
+        type=Path,
+        default=Path("data/H2.csv"),
+        help="Path to the original H2.csv dataset",
     )
-    # In source H2, `Children` is numerical with a few empty values; coerce for checks.
-    df["Children"] = pd.to_numeric(df["Children"], errors="coerce")
-    if df.shape != (79330, 31):
-        raise ValueError(f"Unexpected H2 shape: {df.shape}; expected (79330, 31)")
+
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=Path("outputs/eda"),
+        help="Directory for generated EDA outputs",
+    )
+
+    args = parser.parse_args()
+
+    if not args.data.is_file():
+        parser.error(
+            f"Dataset not found: {args.data}. "
+            "Place H2.csv inside data/ or specify --data PATH."
+        )
+
+    df = pd.read_csv(
+        args.data,
+        keep_default_na=False,
+        na_values=[""],
+        low_memory=False,
+    )
+
+    validate_schema(df)
+    if len(df) != 79330:
+        raise ValueError(
+            f"Unexpected H2 row count: {len(df)}; expected 79330"
+        )
+    # Convert Children to numeric for the EDA calculations.
+    df["Children"] = pd.to_numeric(
+        df["Children"],
+        errors="coerce",
+    )
+
     audit(df, args.out)
     plots(df, args.out)
-    print(f"EDA outputs written to {args.out.resolve()}")
 
+    print("H2 schema validation passed.")
+    print(f"Dataset shape: {df.shape}")
+    print(f"EDA outputs written to {args.out.resolve()}")
 
 if __name__ == "__main__":
     main()
