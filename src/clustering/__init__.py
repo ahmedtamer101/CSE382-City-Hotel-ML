@@ -1,2 +1,2 @@
-"""Clustering package (implementation pending)."""
+"""Leakage-aware feature preparation and preprocessing for clustering."""
 

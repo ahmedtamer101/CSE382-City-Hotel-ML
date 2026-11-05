@@ -1,0 +1,27 @@
+{
+  "cluster_count": 3,
+  "cluster_sizes": [
+    {
+      "cluster_id": 0,
+      "count": 19651,
+      "percentage": 24.77120887432245
+    },
+    {
+      "cluster_id": 1,
+      "count": 54289,
+      "percentage": 68.43438799949578
+    },
+    {
+      "cluster_id": 2,
+      "count": 5390,
+      "percentage": 6.794403126181773
+    }
+  ],
+  "dataset_rows": 79330,
+  "davies_bouldin_duration_seconds": 0.019940200028941035,
+  "davies_bouldin_index": 2.0046722671496835,
+  "davies_bouldin_scope": "full_data",
+  "silhouette_duration_seconds": 0.18473269999958575,
+  "silhouette_scope": "stratified_sample",
+  "silhouette_score": 0.18497227765253998
+}
