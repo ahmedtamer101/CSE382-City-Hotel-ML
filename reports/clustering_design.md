@@ -1,148 +1,124 @@
-# Clustering Feature Preparation and Preprocessing Design
+# Clustering Feature Preparation and Integration Contract
 
-## Scope
+## Scope and analysis point
 
-This document records Member 5's Phase 2 implementation for City Hotel booking clustering. It covers fixed feature construction, fitted preprocessing, targeted data-quality checks, and leakage controls. It does not train K-Means or any other clustering algorithm and does not report clustering performance.
+This document defines Member 5's clustering-owned feature policy. The unit is a booking record, not a unique customer, because H2 has no stable customer identifier. This is a retrospective segmentation of the published H2 record, not a deployable initial-booking customer segmentation. The [original H2 publication](https://pmc.ncbi.nlm.nih.gov/articles/PMC6297060/) defines the observation point as the day before arrival and explains that change-log values were used where available. Some values can therefore reflect booking-lifecycle updates, and some engineered source fields use arrival or cancellation as their boundary.
 
-The official project specification requires genuinely unsupervised clustering, justified source variables, appropriate categorical handling and scaling, leakage auditing, internal evaluation, visualization, and eventually at least three baseline-and-optimized clustering algorithms. Phase 2 implements only the reusable preparation required before those experiments.
+The official requirements call for genuinely unsupervised clustering, justified source variables, suitable encoding and scaling, a leakage audit, internal metrics, visualization, and interpretation. Outcomes, final statuses, and uncertain post-booking fields do not enter fitting.
 
-## Objective and analysis point
+## Verified source contract
 
-The objective is to discover interpretable groups of booking records from planning horizon, arrival season, stay pattern, party composition, product choices, booking channel, and prior guest history.
+The official file has 79,330 rows, 31 source columns, and SHA-256 `6796f5b9b2b9e7281662b29730fc2880f8e614107d0d14d09be2ede1a6e605a4`. The loader requires the exact ordered schema and row count. The official output directory cannot be overwritten unless this checksum matches.
 
-The unit is a booking, not a unique customer. H2 has no stable customer identifier. The analysis is described as booking-characteristics segmentation rather than a guaranteed initial-booking snapshot because published H2 fields may reflect updates made during the booking lifecycle.
+An alternate 79,330-row file with the same schema requires both `--allow-alternate-dataset` and a separate `--output-dir`. This prevents an exploratory run from replacing the official baseline.
 
-Final outcomes and later operational information are not used to fit clusters. Excluded outcome fields may be used only after clustering to describe results, with that distinction stated explicitly.
+## Revised fitting features
 
-## Source data contract
+The exact source allowlist is:
 
-The source boundary retains the exact 31 H2 column labels. `validate_source_schema` rejects missing or unexpected source columns. Load the CSV with whitespace trimming and explicit textual missing markers:
+1. `LeadTime`
+2. `ArrivalDateMonth`
+3. `StaysInWeekendNights`
+4. `StaysInWeekNights`
+5. `Adults`
+6. `Children`
+7. `Babies`
+8. `Meal`
+9. `MarketSegment`
+10. `DistributionChannel`
+11. `IsRepeatedGuest`
+12. `PreviousCancellations`
+13. `PreviousBookingsNotCanceled`
+14. `ReservedRoomType`
+15. `CustomerType`
 
-```python
-pd.read_csv(
-    "data/H2.csv",
-    skipinitialspace=True,
-    na_values=["NULL", "NA"],
-    low_memory=False,
-)
-```
+Deterministic engineering produces these exact 15 fitting columns:
 
-The shared loader is owned by Member 2 and is not modified in this phase.
+`LeadTime`, `TotalNights`, `PreviousCancellations`, `PreviousBookingsNotCanceled`, `WeekendShare`, `PartySize`, `ArrivalDateMonth`, `Meal`, `MarketSegment`, `DistributionChannel`, `IsRepeatedGuest`, `ReservedRoomType`, `CustomerType`, `HasChildren`, and `HasBabies`.
 
-## Selected source features
+`TotalNights`, `WeekendShare`, and `PartySize` replace their raw component counts so those concepts are not double weighted. `HasChildren` and `HasBabies` preserve family-composition signals. Zero-night and zero-person rows remain present and are separately flagged for description.
 
-| Concept | Exact source columns | Representation |
-| --- | --- | --- |
-| Planning horizon | `LeadTime` | Nonnegative count; median imputation, `log1p`, standardization |
-| Arrival season | `ArrivalDateMonth` | Cyclic sine/cosine coordinates plus missing indicator |
-| Stay pattern | `StaysInWeekendNights`, `StaysInWeekNights` | `TotalNights` and `WeekendShare` |
-| Party composition | `Adults`, `Children`, `Babies` | `PartySize`, `HasChildren`, and `HasBabies` |
-| Product | `Meal`, `ReservedRoomType`, `DepositType`, `CustomerType` | Explicit-missing-value imputation and full one-hot encoding |
-| Route to market | `MarketSegment`, `DistributionChannel` | Explicit-missing-value imputation and full one-hot encoding |
-| Prior history | `IsRepeatedGuest`, `PreviousCancellations`, `PreviousBookingsNotCanceled` | Binary category plus log-scaled nonnegative counts |
+## DepositType exclusion
 
-The derived representation avoids keeping both all raw parts and their totals, which would give stay length or party size excessive Euclidean-distance weight.
+`DepositType` is excluded from the source allowlist, engineered fitting frame, one-hot vocabulary, transformed matrix, K-Means fit, internal metrics, and PCA fit. Changing only `DepositType` is covered by automated feature-frame, transformed-matrix, and fitted-label invariance tests and cannot change the prepared feature matrix or clustering result.
 
-Zero-night and zero-person records are retained. They produce zero `TotalNights` or `PartySize`, `WeekendShare` is defined as zero for a zero-night record, and separate flags are preserved outside the model matrix for EDA and interpretation.
+The timing risk is verified rather than merely suspected. The original H2 publication states that `DepositType` is calculated from payments identified before the booking's arrival or cancellation date. That gives canceled and arriving bookings outcome-conditioned observation windows and is incompatible with an initial-booking interpretation. The local H2 audit also found that 99.81% of `Non Refund` bookings were canceled versus 30.48% for other deposit categories. In the original baseline, cluster 2 was 60.34% `Non Refund` and 92.86% canceled. Cancellation was used only to identify this safety risk; it was not supplied to K-Means, used to optimize `k`, or used to select a better-scoring result.
 
-## Exclusions and leakage policy
+The untouched source copy still contains `DepositType`. It is joined to fixed labels by row position only after fitting for profiles and the deposit-type chart.
+
+## Leakage and timing classification
+
+### A. Direct outcome fields
+
+| Excluded columns | Evidence and reason |
+| --- | --- |
+| `IsCanceled`, `ReservationStatus`, `ReservationStatusDate` | Direct outcome or final-status information |
+
+### B. Verified post-booking or outcome-conditioned fields
+
+| Excluded columns | Evidence and reason |
+| --- | --- |
+| `DepositType` | Calculated from payments recorded before arrival or cancellation; the observation window depends on the booking outcome |
+| `BookingChanges` | Counts amendments from PMS entry until check-in or cancellation |
+| `ADR` | Derived from lodging transactions divided by staying nights, rather than being a pristine initial-booking value |
+| `AssignedRoomType` | Operational assignment that can differ because of overbooking or later customer requests |
+| `DaysInWaitingList` | Complete duration from PMS entry until customer confirmation; unavailable at first entry |
+| `Country` | The publication warns that the correct nationality is often not known until check-in; it is also high-cardinality |
+
+### C. Selected fields that may reflect lifecycle updates
+
+H2 uses booking/change-log values relative to the day before arrival. The publication specifically cautions that party composition, stay duration, meal, and room preferences can change after booking. Therefore `PartySize`, `HasChildren`, `HasBabies`, `TotalNights`, `WeekendShare`, `Meal`, and `ReservedRoomType` are valid only as retrospective published-record characteristics. Arrival month, market segment, distribution channel, and customer type also come from booking/change-log tables and may reflect the latest recorded value rather than first entry. `PreviousCancellations`, `PreviousBookingsNotCanceled`, and `IsRepeatedGuest` are defined relative to history before the current booking, but they overlap conceptually and can overweight guest-history behavior.
+
+### D. Conservative or design-driven exclusions
 
 | Excluded columns | Reason |
 | --- | --- |
-| `IsCanceled`, `ReservationStatus`, `ReservationStatusDate` | Direct current-booking outcomes or outcome timing |
-| `AssignedRoomType` | Later room assignment may reflect upgrades, overbooking, or operations |
-| `BookingChanges` | Accumulates after initial booking entry |
-| `DaysInWaitingList` | Final waiting duration is not known at initial booking |
-| `ADR` | Regression target and uncertain booking-time availability; profile only |
-| `ArrivalDateYear` | Risks separating collection periods rather than behavior |
+| `ArrivalDateYear` | Can create collection-period rather than behavioral clusters |
 | `ArrivalDateWeekNumber`, `ArrivalDateDayOfMonth` | Redundant or weak calendar dimensions for this objective |
-| `Country`, `Agent`, `Company` | High-cardinality codes; `Agent` and `Company` also have substantial missingness |
-| `RequiredCarParkingSpaces`, `TotalOfSpecialRequests` | Timing must be agreed with Members 1 and 2 before possible inclusion |
+| `Agent`, `Company` | High-cardinality anonymous identifiers with substantial missingness |
+| `RequiredCarParkingSpaces`, `TotalOfSpecialRequests` | Availability timing still needs team confirmation |
 
-If clustering labels later become inputs to a supervised model, feature construction, fitted preprocessing, and clustering must be fitted inside each supervised training fold. A clusterer fitted on the complete dataset must not be reused as a leakage-free supervised feature generator.
+These distinctions do not prove that every lifecycle-updated field is outcome leakage. They limit the interpretation: the fitted groups describe the published H2 booking snapshots, while direct outcomes and established outcome-conditioned proxies remain excluded.
 
-## Targeted H2 observations
+## Preprocessing
 
-The local file parsed successfully with 79,330 rows and the exact 31-column schema.
+- `LeadTime`, `TotalNights`, and prior-booking counts: median imputation, `log1p`, then standardization.
+- `WeekendShare` and `PartySize`: median imputation and standardization.
+- Arrival month: cyclic sine/cosine values plus a missingness indicator.
+- Categorical fields: explicit `__MISSING__` imputation and full one-hot encoding with unknown levels ignored.
+- Sparse CSR output is retained for K-Means.
+- No clipping or row removal is performed.
 
-Semantic missing values after trimming padded fields and interpreting `NULL`/`NA` are:
+The revised official matrix is 79,330 × 45. All stored values are checked for NaN and infinity before fitting.
 
-| Column | Missing |
-| --- | ---: |
-| `Children` | 4 |
-| `Country` | 24 |
-| `Agent` | 8,131 |
-| `Company` | 75,641 |
+## Shared preprocessing integration contract
 
-All other source columns have zero missing values under this policy. There are 25,902 exact duplicate rows. They are not removed because the anonymized data has no booking identifier; Member 1 must decide whether identical rows are true duplicates or distinct but indistinguishable bookings.
+Inspection of the fetched `origin/main` at `17118fbd5f7cb6d361415d2d612f4312ccf39344` shows that Member 2's current clustering export is not API-compatible with this baseline. Its shared cleaning removes one `ADR > 1000` record and 167 zero-guest records from the official file, leaving 79,162 rows. Its clustering contract also uses `ADR`, `DaysInWaitingList`, `TotalOfSpecialRequests`, `HasAgent`, and `HasCompany`, and produces a different transformed representation. Its names differ for similar concepts (`TotalGuests`/`PartySize`, `WeekendNightRatio`/`WeekendShare`, and `HasKids` versus separate child/baby indicators).
 
-Targeted validity findings:
+Proposed ownership boundary:
 
-- 167 rows have zero total people.
-- 331 rows have zero total nights.
-- 67 rows have both zero people and zero nights.
-- No negative values were found in the selected count features.
-- Selected category cardinalities are modest except for deliberately excluded identifiers/geography: `Country` has 166, `Agent` 223, and `Company` 207 non-missing levels.
+| Owner | Responsibility |
+| --- | --- |
+| Member 2 | Shared H2 loading, exact source-schema validation, missing-marker normalization, and supervised preprocessing/splits |
+| Member 5 | Clustering feature selection, clustering engineering and preprocessing, clustering algorithms, evaluation, and visualization |
 
-Targeted distribution findings:
+The canonical interface still requires explicit team approval. The recommended interface is a shared loader that returns all 79,330 H2 rows in the exact documented 31-column order, enforces schema and dataset identity, and performs agreed safe string/missing-marker normalization only. It must not delete rows or add task-specific features. That normalized source frame can then be passed to Member 5's existing `build_booking_characteristics`. Member 5 should not consume Member 2's current `clustering_all.csv` or clustering preprocessor because that would change the row policy and feature contract. The team must explicitly decide whether category rewrites such as `Undefined` to `SC` or missing belong to the shared normalization layer.
 
-| Feature | Skewness | Maximum | Decision |
-| --- | ---: | ---: | --- |
-| `LeadTime` | 1.390 | 629 | Apply `log1p` |
-| `TotalNights` | 3.924 | 57 | Apply `log1p` |
-| `PartySize` | 0.722 | 12 | Scale without log |
-| `PreviousCancellations` | 16.585 | 21 | Apply `log1p` |
-| `PreviousBookingsNotCanceled` | 23.117 | 72 | Apply `log1p` |
-| `WeekendShare` | 0.991 | 1 | Bounded ratio; scale without log |
+This interface agreement is **pending team approval**. No Member 2 file was modified, and Member 2's cleaning or clustering configuration was not silently adopted.
 
-No clipping is performed. Simple IQR rules label many legitimate zero-inflated count observations as outliers, so clipping requires Member 1's full EDA and a business justification.
+### Separate main-branch archive blocker
 
-## Fixed engineering versus fitted preprocessing
+The same fetched `origin/main` contains tracked `Classification.zip` (blob `9c897eebb7ec832eef6b1419c868686c7ec5c8aa`). In-memory archive inspection found `data/splits/train.csv`, `val.csv`, and `test.csv`, plus three fitted `artifacts/classification/*.joblib` models. This bypasses the repository's ignore rules and the submission rule excluding fitted models and pipelines. It is a team-level integration blocker, not a clustering change. The repository coordinator should remove the archive from tracked `main`, retain only source/report/aggregate outputs, and add an archive-content check or an approved submission-archive policy.
 
-`src/clustering/features.py` performs fixed deterministic work:
-
-- schema and domain validation;
-- the source-column allowlist;
-- leakage exclusions;
-- `TotalNights`, `WeekendShare`, `PartySize`, `HasChildren`, and `HasBabies`;
-- preservation of an untouched source copy and separate edge-case flags.
-
-`src/clustering/pipeline.py` contains transformations that learn from fit data:
-
-- median numerical imputation;
-- categorical missing-value imputation with `__MISSING__`;
-- one-hot category vocabulary;
-- numerical means and standard deviations.
-
-The month encoder and `log1p` are fixed transformations placed inside the sklearn pipeline for reproducible ordering.
-
-## Preprocessing decisions
-
-- Missing numerical values use the fit-data median. The four missing `Children` values therefore lead to missing derived `PartySize`, which is imputed without consulting any outcome.
-- Missing ordinary categories use an explicit `__MISSING__` level.
-- Missing month values map to zero sine/cosine coordinates and a separate missing indicator.
-- `OneHotEncoder(handle_unknown="ignore")` allows future unseen categories without changing the matrix width.
-- Full one-hot columns are not standardized. Standardizing rare dummy columns would give rare categories excessive influence.
-- Numerical variables are standardized after justified log transformation. Scaling is needed because K-Means later uses Euclidean distance.
-- Sparse output is retained. It avoids unnecessary dense one-hot storage and is accepted by scikit-learn K-Means.
-- No random operation occurs in preprocessing, so identical fit data produces deterministic output.
-
-## Risks and dependencies
-
-Member 1 must provide the full EDA decision on duplicates, invalid-looking zero rows, outliers, unusual categories, and temporal drift. These records are preserved until that review.
-
-Member 2 must coordinate the shared CSV loader, missing-marker convention, split/validation protocol, and reusable shared transformations. This implementation does not change `src/data/` or `src/preprocessing/`.
-
-`MarketSegment` and `DistributionChannel` may encode overlapping channel information. `IsRepeatedGuest` may overlap with prior-booking counts. Member 1 should quantify these relationships before Phase 3; retaining both initially is documented and testable.
-
-The H2 extraction process does not guarantee that every value is the original value at booking creation. This limits claims about true booking-time segmentation.
-
-## Testing
-
-From the repository root:
+## Reproduction
 
 ```powershell
+python --version  # exact recorded environment: Python 3.14.7
+python -m pip install -r requirements.txt -c constraints/clustering-milestone1.txt
+python -m src.clustering.experiment --dataset data/H2.csv --output-dir outputs/clustering
+python -m src.clustering.evaluation --dataset data/H2.csv --output-dir outputs/clustering --sample-size 3000 --seed 42
+python -m src.clustering.visualization --dataset data/H2.csv --output-dir outputs/clustering --sample-size 3000 --seed 42
 python -m pytest -q
 ```
 
-The focused tests cover schema and allowlist behavior, leakage exclusion, derived features, missing values, negative inputs, unknown categories, determinism, sparse output dimensions, input immutability, and zero-person/zero-night records. Synthetic fixtures are used only for unit testing and are not experimental results.
+The fixed seed and constrained numerical environment reproduce the counts, assignments, inertia, internal metrics, profiles, and PCA variance. Wall-clock preprocessing, fitting, metric, and total durations remain machine- and load-dependent and are not reproducibility targets.

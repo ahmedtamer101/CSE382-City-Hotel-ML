@@ -20,11 +20,17 @@ from src.clustering.experiment import (
     DEFAULT_DATASET_PATH,
     DEFAULT_OUTPUT_DIRECTORY,
     KMeansBaselineResult,
+    _protect_official_output_directory,
     compute_sha256,
     load_h2_dataset,
     run_kmeans_baseline,
+    validate_dataset_identity,
 )
-from src.clustering.features import LEAKAGE_COLUMNS, MODEL_FEATURE_COLUMNS
+from src.clustering.features import (
+    LEAKAGE_COLUMNS,
+    MODEL_FEATURE_COLUMNS,
+    clean_categorical_values,
+)
 
 
 DEFAULT_SAMPLE_SIZE: Final[int] = 3_000
@@ -207,6 +213,11 @@ def build_cluster_profiles(
         raise ValueError("Leakage field found in model features.")
     # Positional assignment is deliberate: duplicate source index labels are legal.
     frame = features.reset_index(drop=True).copy()
+    # DepositType is deliberately excluded from fitting but retained in the
+    # untouched source rows for post-fit description by positional alignment.
+    frame["DepositType"] = clean_categorical_values(
+        source["DepositType"].reset_index(drop=True)
+    )
     frame["cluster_id"] = labels
     flag_frame = flags.reset_index(drop=True)
     n_rows = len(frame)
@@ -319,6 +330,9 @@ def evaluate_baseline(
 
 def write_evaluation_outputs(result: EvaluationResult, output_dir: Path) -> dict[str, Path]:
     """Persist only small aggregate outputs."""
+    _protect_official_output_directory(
+        result.metadata.get("dataset_sha256"), output_dir
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
     paths = {
         "metrics": output_dir / "evaluation_metrics.json",
@@ -340,10 +354,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIRECTORY)
     parser.add_argument("--sample-size", type=int, default=DEFAULT_SAMPLE_SIZE)
     parser.add_argument("--seed", type=int, default=DEFAULT_SAMPLE_SEED)
+    parser.add_argument(
+        "--allow-alternate-dataset",
+        action="store_true",
+        help="Allow a non-official checksum only in a separate output directory.",
+    )
     args = parser.parse_args(argv)
     try:
         data = load_h2_dataset(args.dataset)
         sha = compute_sha256(args.dataset)
+        validate_dataset_identity(
+            sha,
+            args.output_dir,
+            allow_alternate_dataset=args.allow_alternate_dataset,
+        )
         baseline = run_kmeans_baseline(data, dataset_sha256=sha, dataset_path=args.dataset.as_posix())
         verify_committed_baseline(
             baseline, args.output_dir / "baseline_metrics.json",

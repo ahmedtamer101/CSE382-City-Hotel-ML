@@ -39,8 +39,15 @@ from src.clustering.pipeline import build_clustering_pipeline
 
 
 EXPECTED_H2_ROWS: Final[int] = 79_330
+OFFICIAL_H2_SHA256: Final[str] = (
+    "6796f5b9b2b9e7281662b29730fc2880f8e614107d0d14d09be2ede1a6e605a4"
+)
+REPOSITORY_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 DEFAULT_DATASET_PATH: Final[Path] = Path("data/H2.csv")
-DEFAULT_OUTPUT_DIRECTORY: Final[Path] = Path("outputs/clustering")
+OFFICIAL_OUTPUT_DIRECTORY: Final[Path] = (
+    REPOSITORY_ROOT / "outputs" / "clustering"
+).resolve()
+DEFAULT_OUTPUT_DIRECTORY: Final[Path] = OFFICIAL_OUTPUT_DIRECTORY
 REPRODUCTION_COMMAND: Final[str] = (
     "python -m src.clustering.experiment --dataset data/H2.csv "
     "--output-dir outputs/clustering"
@@ -123,6 +130,67 @@ def compute_sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _resolved_output_directory(output_directory: Path) -> Path:
+    """Return a normalized absolute output path independent of process CWD."""
+    return Path(output_directory).expanduser().resolve()
+
+
+def _targets_official_output_directory(output_directory: Path) -> bool:
+    """Return whether a path is the official directory or one of its children.
+
+    Resolving both sides closes traversal and existing symlink aliases. The
+    official side is anchored to this module's repository, never to process CWD.
+    """
+    resolved = _resolved_output_directory(output_directory)
+    try:
+        resolved.relative_to(OFFICIAL_OUTPUT_DIRECTORY)
+    except ValueError:
+        return False
+    return True
+
+
+def validate_dataset_identity(
+    dataset_sha256: str,
+    output_directory: Path,
+    *,
+    allow_alternate_dataset: bool = False,
+) -> None:
+    """Protect official outputs from an unverified or alternate H2 file.
+
+    A checksum mismatch is rejected by default. An alternate dataset can be
+    used only with explicit opt-in and a separate output directory, so it
+    cannot silently replace the official baseline artifacts.
+    """
+    if dataset_sha256 == OFFICIAL_H2_SHA256:
+        return
+    if not allow_alternate_dataset:
+        raise ValueError(
+            "H2 SHA-256 mismatch: expected official dataset checksum "
+            f"{OFFICIAL_H2_SHA256}, found {dataset_sha256}. No outputs were written."
+        )
+    if _targets_official_output_directory(output_directory):
+        raise ValueError(
+            "Alternate datasets cannot write to the official "
+            f"{OFFICIAL_OUTPUT_DIRECTORY.as_posix()} directory or its children; "
+            "choose a separate "
+            "--output-dir. No outputs were written."
+        )
+
+
+def _protect_official_output_directory(
+    dataset_sha256: str | None,
+    output_directory: Path,
+) -> None:
+    """Require the official checksum before an official artifact is written."""
+    if not _targets_official_output_directory(output_directory):
+        return
+    if dataset_sha256 != OFFICIAL_H2_SHA256:
+        raise ValueError(
+            "Refusing to overwrite official clustering outputs without the "
+            "verified H2 SHA-256."
+        )
 
 
 def load_h2_dataset(
@@ -311,6 +379,9 @@ def write_baseline_outputs(
     output_directory: Path,
 ) -> dict[str, Path]:
     """Write only small tables and metadata; never serialize the fitted model."""
+    _protect_official_output_directory(
+        result.metadata.get("dataset_sha256"), output_directory
+    )
     output_directory.mkdir(parents=True, exist_ok=True)
     paths = {
         "metrics": output_directory / "baseline_metrics.json",
@@ -350,6 +421,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--n-init", type=int, default=10)
     parser.add_argument("--random-state", type=int, default=42)
     parser.add_argument("--max-iter", type=int, default=300)
+    parser.add_argument(
+        "--allow-alternate-dataset",
+        action="store_true",
+        help=(
+            "Allow a non-official checksum only with a non-official output "
+            "directory. Official baseline files remain protected."
+        ),
+    )
     return parser
 
 
@@ -365,10 +444,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     try:
         data = load_h2_dataset(args.dataset)
+        dataset_sha256 = compute_sha256(args.dataset)
+        validate_dataset_identity(
+            dataset_sha256,
+            args.output_dir,
+            allow_alternate_dataset=args.allow_alternate_dataset,
+        )
         result = run_kmeans_baseline(
             data,
             config,
-            dataset_sha256=compute_sha256(args.dataset),
+            dataset_sha256=dataset_sha256,
             dataset_path=args.dataset.as_posix(),
         )
         paths = write_baseline_outputs(result, args.output_dir)

@@ -1,7 +1,7 @@
 """Report figures for the verified, fixed City Hotel K-Means baseline.
 
 Figures describe original-scale booking attributes. PCA alone uses the exact
-48-column matrix fitted by K-Means; the existing labels are never refitted.
+matrix fitted by K-Means; the existing labels are never refitted.
 """
 
 from __future__ import annotations
@@ -35,11 +35,17 @@ from src.clustering.experiment import (
     DEFAULT_DATASET_PATH,
     DEFAULT_OUTPUT_DIRECTORY,
     KMeansBaselineResult,
+    _protect_official_output_directory,
     compute_sha256,
     load_h2_dataset,
     run_kmeans_baseline,
+    validate_dataset_identity,
 )
-from src.clustering.features import LEAKAGE_COLUMNS, MODEL_FEATURE_COLUMNS
+from src.clustering.features import (
+    LEAKAGE_COLUMNS,
+    MODEL_FEATURE_COLUMNS,
+    clean_categorical_values,
+)
 
 
 FIGURE_FILES: Final[dict[str, str]] = {
@@ -75,7 +81,15 @@ def prepare_plot_data(baseline: KMeansBaselineResult) -> pd.DataFrame:
         raise ValueError("Cluster size table has unexpected IDs.")
     if not np.array_equal(expected["count"].to_numpy(), counts):
         raise ValueError("Cluster size table does not match fitted labels.")
-    frame = features.loc[:, PROFILE_INPUTS].reset_index(drop=True).copy(deep=True)
+    frame = features.loc[:, ("LeadTime", "TotalNights", "MarketSegment")].reset_index(
+        drop=True
+    ).copy(deep=True)
+    # DepositType remains available only from the preserved source data; it
+    # must never be reconstructed from or added to the fitted representation.
+    frame["DepositType"] = clean_categorical_values(
+        bundle.source_data["DepositType"].reset_index(drop=True)
+    )
+    frame = frame.loc[:, PROFILE_INPUTS]
     for column in ("LeadTime", "TotalNights"):
         numeric = pd.to_numeric(frame[column], errors="raise")
         if not np.isfinite(numeric).all() or (numeric < 0).any():
@@ -267,6 +281,9 @@ def render_visualizations(
     dense_budget_bytes: int = DEFAULT_DENSE_BUDGET_BYTES,
 ) -> dict[str, Any]:
     """Write six report figures and deterministic, aggregate provenance metadata."""
+    _protect_official_output_directory(
+        baseline.metadata.get("dataset_sha256"), output_dir
+    )
     frame = prepare_plot_data(baseline)
     if not 1 <= sample_size <= DEFAULT_SAMPLE_SIZE:
         raise ValueError("Scatter sample size must be between 1 and 3000.")
@@ -289,7 +306,11 @@ def render_visualizations(
         "total_nights": ("TotalNights in original nights; verified labels; >10 tail", "all_rows"),
         "market_segment": ("original MarketSegment; verified labels", "all_rows"),
         "deposit_type": ("original DepositType; verified labels", "all_rows"),
-        "pca": ("exact fitted 48-feature matrix; verified labels", "stratified_sample"),
+        "pca": (
+            f"exact fitted {baseline.transformed_matrix.shape[1]}-feature matrix; "
+            "verified labels",
+            "stratified_sample",
+        ),
     }
     metadata = {
         "dataset_sha256": baseline.metadata["dataset_sha256"],
@@ -340,10 +361,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIRECTORY)
     parser.add_argument("--sample-size", type=int, default=DEFAULT_SAMPLE_SIZE)
     parser.add_argument("--seed", type=int, default=DEFAULT_SAMPLE_SEED)
+    parser.add_argument(
+        "--allow-alternate-dataset",
+        action="store_true",
+        help="Allow a non-official checksum only in a separate output directory.",
+    )
     args = parser.parse_args(argv)
     try:
         data = load_h2_dataset(args.dataset)
         sha = compute_sha256(args.dataset)
+        validate_dataset_identity(
+            sha,
+            args.output_dir,
+            allow_alternate_dataset=args.allow_alternate_dataset,
+        )
         baseline = run_kmeans_baseline(data, dataset_sha256=sha,
                                        dataset_path=args.dataset.as_posix())
         verify_committed_baseline(

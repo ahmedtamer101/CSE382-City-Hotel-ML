@@ -47,7 +47,8 @@ def test_plot_data_counts_percentages_alignment_and_no_mutation(fixture_baseline
     counts = frame.cluster_id.value_counts().sort_index().to_numpy()
     assert_array_equal(counts, baseline.cluster_sizes["count"])
     assert_allclose(counts / len(frame) * 100, baseline.cluster_sizes["percentage"])
-    assert not set(frame.columns) & LEAKAGE_COLUMNS
+    assert not set(frame.columns) & (LEAKAGE_COLUMNS - {"DepositType"})
+    assert_array_equal(frame.DepositType.to_numpy(), source.DepositType.to_numpy())
     assert not any(column in name for column in LEAKAGE_COLUMNS for name in baseline.feature_names)
 
 

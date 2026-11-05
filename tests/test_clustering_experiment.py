@@ -2,19 +2,28 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
+import src.clustering.experiment as experiment_module
 from src.clustering.experiment import (
     CLUSTER_SIZE_COLUMNS,
+    DEFAULT_OUTPUT_DIRECTORY,
     KMeansBaselineConfig,
+    OFFICIAL_H2_SHA256,
+    OFFICIAL_OUTPUT_DIRECTORY,
+    _protect_official_output_directory,
     build_kmeans_baseline,
     load_h2_dataset,
     main,
     run_kmeans_baseline,
+    validate_dataset_identity,
     write_baseline_outputs,
 )
 from src.clustering.features import LEAKAGE_COLUMNS
@@ -147,7 +156,7 @@ def test_phase_two_preprocessing_and_output_structure_are_compatible() -> None:
     result = run_kmeans_baseline(data)
 
     assert result.metrics["source_feature_count"] == 31
-    assert result.metrics["engineered_feature_count"] == 16
+    assert result.metrics["engineered_feature_count"] == 15
     assert result.metrics["transformed_feature_count"] == len(
         result.feature_names
     )
@@ -203,3 +212,174 @@ def test_cli_reports_missing_dataset_without_creating_outputs(
     assert exit_code == 2
     assert "not found" in captured.err
     assert not output_directory.exists()
+
+
+def test_checksum_mismatch_requires_opt_in_and_separate_outputs(tmp_path) -> None:
+    alternate_output = tmp_path / "alternate"
+    with pytest.raises(ValueError, match="SHA-256 mismatch"):
+        validate_dataset_identity("0" * 64, alternate_output)
+
+    validate_dataset_identity(
+        "0" * 64,
+        alternate_output,
+        allow_alternate_dataset=True,
+    )
+    with pytest.raises(ValueError, match="cannot write to the official"):
+        validate_dataset_identity(
+            "0" * 64,
+            OFFICIAL_OUTPUT_DIRECTORY,
+            allow_alternate_dataset=True,
+        )
+    validate_dataset_identity(OFFICIAL_H2_SHA256, alternate_output)
+
+
+def test_checksum_failure_preserves_existing_outputs(
+    tmp_path, capsys, monkeypatch
+) -> None:
+    dataset = tmp_path / "alternate.csv"
+    dataset.write_text("not used", encoding="utf-8")
+    output_directory = tmp_path / "outputs"
+    output_directory.mkdir()
+    sentinel = output_directory / "baseline_metrics.json"
+    sentinel.write_text("preserve me", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "src.clustering.experiment.load_h2_dataset",
+        lambda path: make_experiment_fixture(),
+    )
+    monkeypatch.setattr(
+        "src.clustering.experiment.compute_sha256", lambda path: "0" * 64
+    )
+
+    exit_code = main(
+        ["--dataset", str(dataset), "--output-dir", str(output_directory)]
+    )
+
+    assert exit_code == 2
+    assert "SHA-256 mismatch" in capsys.readouterr().err
+    assert sentinel.read_text(encoding="utf-8") == "preserve me"
+
+
+def test_malformed_dataset_preserves_existing_outputs(tmp_path, capsys) -> None:
+    malformed = tmp_path / "malformed.csv"
+    make_experiment_fixture().drop(columns="LeadTime").to_csv(
+        malformed, index=False
+    )
+    output_directory = tmp_path / "outputs"
+    output_directory.mkdir()
+    sentinel = output_directory / "baseline_metrics.json"
+    sentinel.write_text("preserve me", encoding="utf-8")
+
+    exit_code = main(
+        ["--dataset", str(malformed), "--output-dir", str(output_directory)]
+    )
+
+    assert exit_code == 2
+    assert "schema mismatch" in capsys.readouterr().err
+    assert sentinel.read_text(encoding="utf-8") == "preserve me"
+
+
+def test_official_output_directory_is_repository_anchored() -> None:
+    expected = (
+        Path(__file__).resolve().parents[1] / "outputs" / "clustering"
+    ).resolve()
+    assert OFFICIAL_OUTPUT_DIRECTORY == expected
+    assert DEFAULT_OUTPUT_DIRECTORY == expected
+    assert OFFICIAL_OUTPUT_DIRECTORY.is_absolute()
+
+
+def test_official_output_protection_is_cwd_and_spelling_independent(
+    monkeypatch,
+) -> None:
+    # Use an existing directory on the repository drive so Windows can express
+    # the official path with a relative traversal spelling.
+    outside = OFFICIAL_OUTPUT_DIRECTORY.parents[2]
+    monkeypatch.chdir(outside)
+    relative_with_traversal = Path(os.path.relpath(OFFICIAL_OUTPUT_DIRECTORY, outside))
+    candidates = (
+        OFFICIAL_OUTPUT_DIRECTORY,
+        relative_with_traversal,
+        OFFICIAL_OUTPUT_DIRECTORY / "alternate-run",
+    )
+
+    for candidate in candidates:
+        with pytest.raises(ValueError, match="cannot write to the official"):
+            validate_dataset_identity(
+                "0" * 64,
+                candidate,
+                allow_alternate_dataset=True,
+            )
+        with pytest.raises(ValueError, match="Refusing to overwrite official"):
+            _protect_official_output_directory("0" * 64, candidate)
+
+    # A verified dataset remains permitted from a non-repository CWD.
+    validate_dataset_identity(OFFICIAL_H2_SHA256, OFFICIAL_OUTPUT_DIRECTORY)
+    _protect_official_output_directory(OFFICIAL_H2_SHA256, OFFICIAL_OUTPUT_DIRECTORY)
+
+
+def test_existing_symlink_alias_to_official_output_is_rejected(
+    tmp_path, monkeypatch
+) -> None:
+    fake_official = (tmp_path / "repo" / "outputs" / "clustering").resolve()
+    fake_official.mkdir(parents=True)
+    alias = tmp_path / "official-output-alias"
+    try:
+        alias.symlink_to(fake_official, target_is_directory=True)
+    except OSError as error:
+        pytest.skip(
+            f"directory symlinks are not supported in this environment: {error}"
+        )
+
+    monkeypatch.setattr(
+        experiment_module, "OFFICIAL_OUTPUT_DIRECTORY", fake_official
+    )
+    with pytest.raises(ValueError, match="cannot write to the official"):
+        validate_dataset_identity(
+            "0" * 64,
+            alias,
+            allow_alternate_dataset=True,
+        )
+
+
+def test_all_clustering_writers_preserve_outputs_for_alternate_checksum(
+    tmp_path, monkeypatch
+) -> None:
+    from src.clustering.evaluation import evaluate_baseline, write_evaluation_outputs
+    from src.clustering.visualization import render_visualizations
+
+    fake_official = (tmp_path / "repo" / "outputs" / "clustering").resolve()
+    fake_official.mkdir(parents=True)
+    sentinels = {
+        fake_official / "baseline_metrics.json": b"baseline sentinel",
+        fake_official / "evaluation_metrics.json": b"evaluation sentinel",
+        fake_official / "visualization_metadata.json": b"visualization sentinel",
+    }
+    for path, content in sentinels.items():
+        path.write_bytes(content)
+    before = {
+        path: hashlib.sha256(path.read_bytes()).hexdigest() for path in sentinels
+    }
+
+    monkeypatch.setattr(
+        experiment_module, "OFFICIAL_OUTPUT_DIRECTORY", fake_official
+    )
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    monkeypatch.chdir(outside)
+    baseline = run_kmeans_baseline(
+        make_experiment_fixture(), dataset_sha256="alternate-checksum"
+    )
+
+    with pytest.raises(ValueError, match="Refusing to overwrite official"):
+        write_baseline_outputs(baseline, fake_official)
+    evaluated = evaluate_baseline(baseline, max_samples=12)
+    with pytest.raises(ValueError, match="Refusing to overwrite official"):
+        write_evaluation_outputs(evaluated, fake_official)
+    with pytest.raises(ValueError, match="Refusing to overwrite official"):
+        render_visualizations(baseline, fake_official, sample_size=12)
+
+    after = {
+        path: hashlib.sha256(path.read_bytes()).hexdigest() for path in sentinels
+    }
+    assert after == before
+    assert set(fake_official.iterdir()) == set(sentinels)

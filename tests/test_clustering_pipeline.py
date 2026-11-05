@@ -75,9 +75,9 @@ def test_output_dimension_matches_reported_feature_names() -> None:
 
     assert sparse.issparse(transformed)
     assert transformed.shape == (len(features), len(names))
-    # Six numeric outputs, three month outputs, and 17 one-hot columns
+    # Six numeric outputs, three month outputs, and 15 one-hot columns
     # learned from this deliberately tiny two-row fixture.
-    assert len(names) == 26
+    assert len(names) == 24
 
 
 def test_leakage_values_cannot_change_model_matrix() -> None:
@@ -98,6 +98,23 @@ def test_leakage_values_cannot_change_model_matrix() -> None:
     assert_allclose(original_matrix.toarray(), altered_matrix.toarray())
     names = pipeline.named_steps["preprocessor"].get_feature_names_out()
     assert not any(column in name for column in LEAKAGE_COLUMNS for name in names)
+
+
+def test_deposit_type_change_cannot_change_prepared_matrix() -> None:
+    original = make_h2_fixture()
+    altered = original.copy(deep=True)
+    altered["DepositType"] = ["Refundable", "No Deposit"]
+
+    original_features = build_booking_characteristics(original).model_features
+    altered_features = build_booking_characteristics(altered).model_features
+    pipeline = build_clustering_pipeline().fit(original_features)
+
+    original_matrix = pipeline.transform(original_features)
+    altered_matrix = pipeline.transform(altered_features)
+
+    assert_allclose(original_matrix.toarray(), altered_matrix.toarray())
+    names = pipeline.named_steps["preprocessor"].get_feature_names_out()
+    assert not any("DepositType" in name for name in names)
 
 
 def test_zero_person_and_zero_night_rows_transform_to_finite_values() -> None:

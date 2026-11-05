@@ -65,7 +65,6 @@ CLUSTERING_INPUT_ALLOWLIST: Final[tuple[str, ...]] = (
     "PreviousCancellations",
     "PreviousBookingsNotCanceled",
     "ReservedRoomType",
-    "DepositType",
     "CustomerType",
 )
 
@@ -78,6 +77,7 @@ LEAKAGE_COLUMNS: Final[frozenset[str]] = frozenset(
         "AssignedRoomType",
         "BookingChanges",
         "DaysInWaitingList",
+        "DepositType",
     }
 )
 
@@ -86,14 +86,24 @@ EXCLUDED_FEATURE_POLICY: Final = MappingProxyType(
         "IsCanceled": "current-booking outcome",
         "ReservationStatus": "final reservation outcome",
         "ReservationStatusDate": "date of a final status event",
-        "ADR": "regression target and uncertain booking-time availability",
+        "ADR": (
+            "transaction-derived rate using lodging transactions and stay nights; "
+            "not an initial-booking snapshot"
+        ),
         "AssignedRoomType": "later operational assignment rather than request",
         "BookingChanges": "accumulates after the booking is created",
         "DaysInWaitingList": "final waiting duration is not initially known",
+        "DepositType": (
+            "verified post-booking, outcome-conditioned payment summary: the "
+            "publication derives it from payments before arrival or cancellation"
+        ),
         "ArrivalDateYear": "may create collection-period clusters",
         "ArrivalDateWeekNumber": "redundant with cyclic arrival season",
         "ArrivalDateDayOfMonth": "weak calendar meaning for this objective",
-        "Country": "high-cardinality geography; reserved for profiling",
+        "Country": (
+            "high-cardinality geography whose correct value may only be known "
+            "at check-in"
+        ),
         "Agent": "high-cardinality anonymous identifier",
         "Company": "high-cardinality, mostly missing anonymous identifier",
         "RequiredCarParkingSpaces": "availability timing needs team confirmation",
@@ -132,7 +142,6 @@ CATEGORICAL_FEATURES: Final[tuple[str, ...]] = (
     "DistributionChannel",
     "IsRepeatedGuest",
     "ReservedRoomType",
-    "DepositType",
     "CustomerType",
     "HasChildren",
     "HasBabies",
@@ -224,7 +233,7 @@ def _numeric_source(data: pd.DataFrame) -> pd.DataFrame:
     return numeric
 
 
-def _clean_categorical(series: pd.Series) -> pd.Series:
+def clean_categorical_values(series: pd.Series) -> pd.Series:
     """Trim category labels while preserving missing values for imputation."""
     cleaned = series.astype("object").copy()
     present = cleaned.notna()
@@ -253,7 +262,7 @@ def build_booking_characteristics(data: pd.DataFrame) -> ClusteringFeatureBundle
     source_data = data.copy(deep=True)
     numeric = _numeric_source(data)
 
-    arrival_month = _clean_categorical(data["ArrivalDateMonth"])
+    arrival_month = clean_categorical_values(data["ArrivalDateMonth"])
     invalid_months = sorted(
         set(arrival_month.dropna().unique()).difference(VALID_MONTHS)
     )
@@ -295,10 +304,9 @@ def build_booking_characteristics(data: pd.DataFrame) -> ClusteringFeatureBundle
         "MarketSegment",
         "DistributionChannel",
         "ReservedRoomType",
-        "DepositType",
         "CustomerType",
     ):
-        model_features[column] = _clean_categorical(data[column])
+        model_features[column] = clean_categorical_values(data[column])
 
     model_features["IsRepeatedGuest"] = repeat_guest.map({0: "no", 1: "yes"})
     model_features["HasChildren"] = _presence_label(numeric["Children"])

@@ -6,19 +6,20 @@
     "AssignedRoomType",
     "BookingChanges",
     "DaysInWaitingList",
+    "DepositType",
     "IsCanceled",
     "ReservationStatus",
     "ReservationStatusDate"
   ],
   "matrix": {
-    "columns": 48,
-    "dense_equivalent_bytes": 30462720,
-    "density": 0.35318553300558847,
+    "columns": 45,
+    "dense_equivalent_bytes": 28558800,
+    "density": 0.3545090129837388,
     "format": "csr",
     "is_sparse": true,
-    "nonzero_values": 1344874,
+    "nonzero_values": 1265544,
     "rows": 79330,
-    "stored_bytes": 16455812
+    "stored_bytes": 15503852
   },
   "model_serialized": false,
   "package_versions": {
@@ -71,9 +72,6 @@
     "categorical__ReservedRoomType_F",
     "categorical__ReservedRoomType_G",
     "categorical__ReservedRoomType_P",
-    "categorical__DepositType_No Deposit",
-    "categorical__DepositType_Non Refund",
-    "categorical__DepositType_Refundable",
     "categorical__CustomerType_Contract",
     "categorical__CustomerType_Group",
     "categorical__CustomerType_Transient",

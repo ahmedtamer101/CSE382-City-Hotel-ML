@@ -96,6 +96,19 @@ def test_allowlist_and_model_features_exclude_leakage() -> None:
     assert tuple(bundle.model_features.columns) == MODEL_FEATURE_COLUMNS
     assert set(CLUSTERING_INPUT_ALLOWLIST).isdisjoint(LEAKAGE_COLUMNS)
     assert set(bundle.model_features.columns).isdisjoint(LEAKAGE_COLUMNS)
+    assert "DepositType" not in CLUSTERING_INPUT_ALLOWLIST
+    assert "DepositType" not in bundle.model_features
+
+
+def test_changing_only_deposit_type_cannot_change_prepared_features() -> None:
+    original = make_h2_fixture()
+    altered = original.copy(deep=True)
+    altered["DepositType"] = ["Refundable", "No Deposit"]
+
+    original_features = build_booking_characteristics(original).model_features
+    altered_features = build_booking_characteristics(altered).model_features
+
+    assert_frame_equal(original_features, altered_features)
 
 
 def test_source_schema_requires_all_and_only_h2_columns() -> None:

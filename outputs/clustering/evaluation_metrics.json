@@ -3,25 +3,25 @@
   "cluster_sizes": [
     {
       "cluster_id": 0,
-      "count": 40174,
-      "percentage": 50.64162359763015
+      "count": 19651,
+      "percentage": 24.77120887432245
     },
     {
       "cluster_id": 1,
-      "count": 33752,
-      "percentage": 42.54632547586033
+      "count": 54289,
+      "percentage": 68.43438799949578
     },
     {
       "cluster_id": 2,
-      "count": 5404,
-      "percentage": 6.812050926509518
+      "count": 5390,
+      "percentage": 6.794403126181773
     }
   ],
   "dataset_rows": 79330,
-  "davies_bouldin_duration_seconds": 0.020589200081303716,
-  "davies_bouldin_index": 2.1907288368612856,
+  "davies_bouldin_duration_seconds": 0.019940200028941035,
+  "davies_bouldin_index": 2.0046722671496835,
   "davies_bouldin_scope": "full_data",
-  "silhouette_duration_seconds": 0.18438099999912083,
+  "silhouette_duration_seconds": 0.18473269999958575,
   "silhouette_scope": "stratified_sample",
-  "silhouette_score": 0.12139192941153554
+  "silhouette_score": 0.18497227765253998
 }

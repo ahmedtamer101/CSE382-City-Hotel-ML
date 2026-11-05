@@ -1,5 +1,5 @@
 {
-  "baseline_inertia": 597856.3237440714,
+  "baseline_inertia": 575905.1184983611,
   "baseline_parameters": {
     "init": "k-means++",
     "max_iter": 300,
@@ -7,12 +7,12 @@
     "n_init": 10,
     "random_state": 42
   },
-  "baseline_transformed_features": 48,
+  "baseline_transformed_features": 45,
   "dataset_sha256": "6796f5b9b2b9e7281662b29730fc2880f8e614107d0d14d09be2ede1a6e605a4",
   "dbi_rows": 79330,
   "dense_budget_bytes": 67108864,
   "distance_space": "exact fitted Phase 3 transformed feature matrix",
-  "full_dense_feature_bytes_estimate": 30462720,
+  "full_dense_feature_bytes_estimate": 28558800,
   "outcome_fields_used": false,
   "package_versions": {
     "numpy": "2.5.4",
@@ -23,8 +23,8 @@
   },
   "row_alignment": "original positional order; no rows removed",
   "sample_cluster_counts": {
-    "0": 1519,
-    "1": 1277,
+    "0": 743,
+    "1": 2053,
     "2": 204
   },
   "sample_max_rows": 3000,
